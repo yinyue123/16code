@@ -52,11 +52,13 @@ jobs:
           echo "----- assets to publish -----"; ls -lh dist/
 
       - name: Publish GitHub Release
-        if: github.ref_type == 'tag'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
+          # tag run -> the tag (v0.1.0); manual run -> the chosen version.
+          tag_name: ${{ github.event.inputs.version || github.ref_name }}
+          name: ${{ github.event.inputs.version || github.ref_name }}
+          # manual/dev mirrors are marked pre-release.
+          prerelease: ${{ github.ref_type != 'tag' }}
           files: dist/*
           fail_on_unmatched_files: true
           body: |
