@@ -2,10 +2,17 @@
   // Workers project name — must match the project in the Cloudflare dashboard.
   "name": "16code",
   "compatibility_date": "2025-05-05",
-  // Static-assets-only Worker (no script): serve the VitePress build output.
+  // JS entry: handles requests that don't match a static file (e.g. /api/*).
+  "main": "src/index.ts",
   "assets": {
     "directory": "docs/.vitepress/dist",
+    // Lets the Worker hand non-api requests back to the static site.
+    "binding": "ASSETS",
     // Serve VitePress's generated 404.html for unknown paths.
     "not_found_handling": "404-page"
   }
+  // Optional — enable code-level per-IP rate limiting:
+  //   1) Dashboard → Storage & Databases → KV → create a namespace
+  //   2) uncomment below with its id, then redeploy
+  // ,"kv_namespaces": [{ "binding": "RL", "id": "<your-kv-namespace-id>" }]
 }
