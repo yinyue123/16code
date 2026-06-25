@@ -9,9 +9,13 @@ name: release
 # values as the code repo / web3 backup.yml:
 #   R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ENDPOINT, R2_BUCKET
 #
-# Flow: in the `code` repo push `code-v0.1.0` (builds + uploads to R2 under
-# code-pkg/v0.1.0/), then here push the matching `v0.1.0` tag to publish it:
-#   git tag v0.1.0 && git push origin v0.1.0
+# Versions:
+#   v0.1  -> pulls code-pkg/v0.1/, publishes a normal public Release `v0.1`.
+#   dev   -> pulls code-pkg/dev/, republishes a single rolling pre-release `dev`
+#            (the old `dev` release + tag are deleted first, then recreated).
+#
+# Usually driven by push_pkg.sh in the code repo (it dispatches this after the
+# build). Can also be run from the Actions tab, or by pushing a v* tag.
 
 on:
   push:
@@ -20,9 +24,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to mirror from R2 (e.g. v0.1.0 or latest)'
+        description: 'Version to mirror from R2 (e.g. v0.1, or dev)'
         required: true
-        default: latest
+        default: dev
 
 permissions:
   contents: write   # create the public Release + upload assets
@@ -36,8 +40,9 @@ jobs:
       AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
       R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
       R2_BUCKET: ${{ secrets.R2_BUCKET }}
-      # tag run -> the tag (v0.1.0); manual run -> the chosen input.
+      # tag run -> the tag (v0.1); manual run -> the chosen input.
       VERSION: ${{ github.event.inputs.version || github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
     steps:
       - name: Download packages from R2 (private bucket, with credentials)
         run: |
@@ -51,14 +56,17 @@ jobs:
           rm -f dist/manifest.txt dist/docs.tar.gz
           echo "----- assets to publish -----"; ls -lh dist/
 
+      - name: Clear previous dev release
+        if: env.VERSION == 'dev'
+        run: gh release delete dev --cleanup-tag --yes || true
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          # tag run -> the tag (v0.1.0); manual run -> the chosen version.
-          tag_name: ${{ github.event.inputs.version || github.ref_name }}
-          name: ${{ github.event.inputs.version || github.ref_name }}
-          # manual/dev mirrors are marked pre-release.
-          prerelease: ${{ github.ref_type != 'tag' }}
+          tag_name: ${{ env.VERSION }}
+          name: ${{ env.VERSION }}
+          # the rolling `dev` mirror is a pre-release; real versions are not.
+          prerelease: ${{ env.VERSION == 'dev' }}
           files: dist/*
           fail_on_unmatched_files: true
           body: |
@@ -67,7 +75,7 @@ jobs:
             **Linux 直接下载(免登录):**
             ```bash
             # 服务端 (Debian/Ubuntu) —— 具体文件名见下方 Assets
-            curl -LO https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/<package-name>.deb
+            curl -LO https://github.com/${{ github.repository }}/releases/download/${{ env.VERSION }}/<package-name>.deb
             sudo dpkg -i <package-name>.deb
             ```
-            Docker: `podman pull ghcr.io/${{ github.repository_owner }}/16code:${{ github.ref_name }}`
+            Docker: `podman pull ghcr.io/${{ github.repository_owner }}/16code:${{ env.VERSION }}`
