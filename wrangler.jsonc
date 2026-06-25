@@ -1,0 +1,11 @@
+{
+  // Workers project name — must match the project in the Cloudflare dashboard.
+  "name": "16code",
+  "compatibility_date": "2025-05-05",
+  // Static-assets-only Worker (no script): serve the VitePress build output.
+  "assets": {
+    "directory": "docs/.vitepress/dist",
+    // Serve VitePress's generated 404.html for unknown paths.
+    "not_found_handling": "404-page"
+  }
+}
